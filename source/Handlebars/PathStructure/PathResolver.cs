@@ -93,8 +93,15 @@ namespace HandlebarsDotNet.PathStructure
             }
             
             chainSegment = ResolveMemberName(instance, chainSegment, context.Configuration);
-            
-            return new ObjectAccessor(instance).TryGetValue(chainSegment, out value);
+
+            var accessor = chainSegment.GetDescriptorFor(instance).MemberAccessor;
+            if (accessor == null)
+            {
+                value = null!;
+                return false;
+            }
+
+            return accessor.TryGetValue(instance, chainSegment, out value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

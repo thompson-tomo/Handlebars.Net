@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using HandlebarsDotNet.Collections;
 using HandlebarsDotNet.EqualityComparers;
 using HandlebarsDotNet.Runtime;
@@ -25,18 +26,31 @@ namespace HandlebarsDotNet.ObjectDescriptors
 
         private readonly IObserver<IObservableEvent<IObjectDescriptorProvider>> _observer;
 
+        private int _version;
+
         public static ObjectDescriptorFactory? Current => AmbientContext.Current?.ObjectDescriptorFactory;
-        
+
+        /// <summary>
+        /// Monotonic stamp bumped whenever the provider set changes; lets external
+        /// per-call-site descriptor caches (see <see cref="PathStructure.ChainSegment"/>)
+        /// detect that previously resolved descriptors may be stale.
+        /// </summary>
+        internal int Version => Volatile.Read(ref _version);
+
         public ObjectDescriptorFactory(ObservableList<IObjectDescriptorProvider>? providers = null)
         {
             _providers = new ObservableList<IObjectDescriptorProvider>();
-             
+
             if (providers != null) Append(providers);
-            
-            _observer = ObserverBuilder<IObservableEvent<IObjectDescriptorProvider>>.Create(_descriptorsCache)
-                .OnEvent<AddedObservableEvent<IObjectDescriptorProvider>>((@event, state) => state.Clear())
+
+            _observer = ObserverBuilder<IObservableEvent<IObjectDescriptorProvider>>.Create(this)
+                .OnEvent<AddedObservableEvent<IObjectDescriptorProvider>>((@event, state) =>
+                {
+                    state._descriptorsCache.Clear();
+                    Interlocked.Increment(ref state._version);
+                })
                 .Build();
-            
+
             _providers.Subscribe(this);
         }
 
