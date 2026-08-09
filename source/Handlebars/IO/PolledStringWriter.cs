@@ -7,7 +7,11 @@ namespace HandlebarsDotNet
 {
     public class ReusableStringWriter : StringWriter
     {
-        private static readonly InternalObjectPool<ReusableStringWriter, Policy> Pool = new InternalObjectPool<ReusableStringWriter, Policy>(new Policy(16));
+        // Retain up to 32K chars (64KB, below the LOH threshold) so that templates producing
+        // typical page-sized output keep their grown StringBuilder across renders. The previous
+        // 4096-char limit made any render larger than 4KB discard the writer, forcing every
+        // subsequent render to re-grow a fresh StringBuilder(16) chunk by chunk.
+        private static readonly InternalObjectPool<ReusableStringWriter, Policy> Pool = new InternalObjectPool<ReusableStringWriter, Policy>(new Policy(16, 32 * 1024));
         
         private IFormatProvider _formatProvider = null!;
 
