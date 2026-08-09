@@ -68,10 +68,15 @@ namespace HandlebarsDotNet.Compiler
                 }
 
                 var bindingContext = CompilationContext.Args.BindingContext;
+                var options = New(() => new HelperOptions(pathInfo, bindingContext));
+                var contextValue = New(() => new Context(bindingContext));
+                var args = New(() => new Arguments(0));
                 var textWriter = CompilationContext.Args.EncodedWriter;
-                // Single NoInlining entry point instead of inline options/context/arguments
-                // construction + dispatch — see CompiledHelperInvokers for rationale.
-                return Call(() => CompiledHelperInvokers.WriteInvoke(textWriter, helper, pathInfo, bindingContext));
+                // Kept inline (unlike the plain-path statement route below): this is the
+                // hottest render-time shape, and routing it through a NoInlining entry point
+                // costs ~2ns per value per render. Compile cost of this shape is moderate
+                // because the interface dispatch below cannot be inline-expanded by the JIT.
+                return Call(() => helper.Value.Invoke(textWriter, options, contextValue, args));
             }
 
             var writer = CompilationContext.Args.EncodedWriter;

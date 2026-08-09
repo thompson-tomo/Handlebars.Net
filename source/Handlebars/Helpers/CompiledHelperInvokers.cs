@@ -14,16 +14,6 @@ namespace HandlebarsDotNet.Helpers
     internal static class CompiledHelperInvokers
     {
         [MethodImpl(MethodImplOptions.NoInlining)]
-        internal static void WriteInvoke(
-            in EncodedTextWriter writer,
-            Ref<IHelperDescriptor<HelperOptions>> helper,
-            PathInfo pathInfo,
-            BindingContext bindingContext)
-        {
-            helper.Value.Invoke(writer, new HelperOptions(pathInfo, bindingContext), new Context(bindingContext), new Arguments(0));
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
         internal static object? Invoke(
             Ref<IHelperDescriptor<HelperOptions>> helper,
             PathInfo pathInfo,
