@@ -12,7 +12,6 @@ namespace HandlebarsDotNet.PathStructure
             if (pathInfo.IsPureThis) return context.Value;
             
             var instance = context.Value;
-            var throwOnUnresolvedBindingExpression = context.Configuration.ThrowOnUnresolvedBindingExpression;
 
             var segments = pathInfo.Segments;
             for (var segmentIndex = 0; segmentIndex < segments.Length; segmentIndex++)
@@ -21,15 +20,15 @@ namespace HandlebarsDotNet.PathStructure
                 if (segment.IsThis) continue;
                 if (segment.IsParent)
                 {
-                    context = context.ParentContext!;
-                    if (context == null!)
+                    var parent = context.ParentContext;
+                    if (parent == null)
                     {
                         instance = UndefinedBindingResult.Create("..");
                         goto undefined;
                     }
 
+                    context = parent;
                     instance = context.Value;
-                    throwOnUnresolvedBindingExpression = context.Configuration.ThrowOnUnresolvedBindingExpression;
                     continue;
                 }
 
@@ -52,7 +51,9 @@ namespace HandlebarsDotNet.PathStructure
             return instance;
             
             undefined:
-            if (throwOnUnresolvedBindingExpression)
+            // Only consult configuration on the (rare) unresolved branch; reading it eagerly
+            // costs two dispatched property reads per resolve on the hot path.
+            if (context.Configuration.ThrowOnUnresolvedBindingExpression)
             {
                 Throw.Undefined(pathInfo, (UndefinedBindingResult) instance);
             }
