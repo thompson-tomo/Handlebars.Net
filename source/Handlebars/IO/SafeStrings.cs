@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace HandlebarsDotNet.IO
 {
@@ -16,15 +17,26 @@ namespace HandlebarsDotNet.IO
         private static readonly ConditionalWeakTable<string, object> Marked = new();
         private static readonly object Sentinel = new();
 
+        // Marking only ever happens when a helper's captured output is written (ReturnInvoke).
+        // Most applications never mark a single string, yet IsSafe sits on the hot path of every
+        // string written to output — so keep a global "has anything ever been marked" latch to
+        // skip the ConditionalWeakTable probe entirely until the first Mark. The latch is written
+        // with release semantics after the table entry exists, so a true reader always observes
+        // the corresponding table entry; a stale false reader merely re-encodes on the same
+        // thread-interleaving that was already possible before the mark completed.
+        private static bool _anyMarked;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string Mark(string value)
         {
             if (value.Length == 0) return value;
             Marked.GetValue(value, _ => Sentinel);
+            Volatile.Write(ref _anyMarked, true);
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsSafe(string value) => value.Length == 0 || Marked.TryGetValue(value, out _);
+        public static bool IsSafe(string value)
+            => value.Length == 0 || (Volatile.Read(ref _anyMarked) && Marked.TryGetValue(value, out _));
     }
 }

@@ -93,6 +93,63 @@ namespace HandlebarsDotNet.PathStructure
         
         internal readonly WellKnownVariable WellKnownVariable;
 
+        // Monomorphic inline cache for render-time member access (see PathResolver.TryAccessMember):
+        // most call sites see one instance type under one descriptor factory, so a single
+        // immutable (factory, version, type) -> descriptor entry avoids the ambient-context
+        // probe plus type-keyed dictionary lookup on every access. Reference assignment keeps
+        // readers consistent; a stale entry is invalidated by the factory version stamp.
+        private DescriptorCacheEntry? _descriptorCache;
+
+        private sealed class DescriptorCacheEntry
+        {
+            public readonly ObjectDescriptors.ObjectDescriptorFactory Factory;
+            public readonly int Version;
+            public readonly Type Type;
+            public readonly ObjectDescriptors.ObjectDescriptor Descriptor;
+
+            public DescriptorCacheEntry(ObjectDescriptors.ObjectDescriptorFactory factory, int version, Type type, ObjectDescriptors.ObjectDescriptor descriptor)
+            {
+                Factory = factory;
+                Version = version;
+                Type = type;
+                Descriptor = descriptor;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ObjectDescriptors.ObjectDescriptor GetDescriptorFor(object instance)
+        {
+            var factory = ObjectDescriptors.ObjectDescriptorFactory.Current;
+            if (factory == null) return ObjectDescriptors.ObjectDescriptor.Empty;
+
+            var type = instance.GetType();
+            var cache = _descriptorCache;
+            if (cache != null
+                && ReferenceEquals(cache.Factory, factory)
+                && ReferenceEquals(cache.Type, type)
+                && cache.Version == factory.Version)
+            {
+                return cache.Descriptor;
+            }
+
+            return GetDescriptorSlow(factory, type);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private ObjectDescriptors.ObjectDescriptor GetDescriptorSlow(ObjectDescriptors.ObjectDescriptorFactory factory, Type type)
+        {
+            // Read the version before resolving so a concurrent provider registration can only
+            // produce an entry that immediately misses (never a stale entry stamped fresh).
+            var version = factory.Version;
+            if (!factory.TryGetDescriptor(type, out var descriptor))
+            {
+                descriptor = ObjectDescriptors.ObjectDescriptor.Empty;
+            }
+
+            _descriptorCache = new DescriptorCacheEntry(factory, version, type, descriptor);
+            return descriptor;
+        }
+
         /// <summary>
         /// Returns string representation of current <see cref="ChainSegment"/>
         /// </summary>

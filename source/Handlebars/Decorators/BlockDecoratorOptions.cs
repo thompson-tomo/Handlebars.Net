@@ -84,8 +84,8 @@ namespace HandlebarsDotNet
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Template(in EncodedTextWriter writer, BindingContext context) => OriginalTemplate(writer, context);
         
-        IIndexed<string, IHelperDescriptor<HelperOptions>> IHelpersRegistry.GetHelpers() => Frame.Helpers;
+        IIndexed<string, IHelperDescriptor<HelperOptions>> IHelpersRegistry.GetHelpers() => ((IHelpersRegistry) Frame).GetHelpers();
 
-        IIndexed<string, IHelperDescriptor<BlockHelperOptions>> IHelpersRegistry.GetBlockHelpers() => Frame.BlockHelpers;
+        IIndexed<string, IHelperDescriptor<BlockHelperOptions>> IHelpersRegistry.GetBlockHelpers() => ((IHelpersRegistry) Frame).GetBlockHelpers();
     }
 }

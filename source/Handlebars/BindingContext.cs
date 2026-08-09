@@ -66,6 +66,7 @@ namespace HandlebarsDotNet
         private void Initialize()
         {
             Root = ParentContext?.Root ?? this;
+            HasFrameHelpers = ParentContext?.HasFrameHelpers ?? false;
             
             ContextDataObject.AddOrReplace(ChainSegment.Root, Root.Value, out WellKnownVariables[(int) WellKnownVariable.Root]);
 
@@ -117,8 +118,16 @@ namespace HandlebarsDotNet
         internal CascadeIndex<string, IHelperDescriptor<BlockHelperOptions>, StringEqualityComparer> BlockHelpers { get; }
 
         internal TemplateDelegate? PartialBlockTemplate { get; set; }
-        
+
         internal short PartialDepth { get; set; }
+
+        /// <summary>
+        /// <c>true</c> once any code obtained this frame's (or an ancestor frame's) helper
+        /// registries for writing — see <see cref="IHelpersRegistry"/>. Until then the
+        /// per-frame helper chain is known to be empty, letting hot paths
+        /// (<see cref="Helpers.LateBindHelperDescriptor"/>) skip the cascade lookup entirely.
+        /// </summary>
+        internal bool HasFrameHelpers { get; set; }
 
         public object? Value { get; set; }
 
@@ -203,8 +212,16 @@ namespace HandlebarsDotNet
             }
         }
 
-        IIndexed<string, IHelperDescriptor<HelperOptions>> IHelpersRegistry.GetHelpers() => Helpers;
+        IIndexed<string, IHelperDescriptor<HelperOptions>> IHelpersRegistry.GetHelpers()
+        {
+            HasFrameHelpers = true;
+            return Helpers;
+        }
 
-        IIndexed<string, IHelperDescriptor<BlockHelperOptions>> IHelpersRegistry.GetBlockHelpers() => BlockHelpers;
+        IIndexed<string, IHelperDescriptor<BlockHelperOptions>> IHelpersRegistry.GetBlockHelpers()
+        {
+            HasFrameHelpers = true;
+            return BlockHelpers;
+        }
     }
 }

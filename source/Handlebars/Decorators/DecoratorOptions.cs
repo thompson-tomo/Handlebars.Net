@@ -25,8 +25,8 @@ namespace HandlebarsDotNet
         
         public PathInfo Name { get; }
         
-        IIndexed<string, IHelperDescriptor<HelperOptions>> IHelpersRegistry.GetHelpers() => Frame.Helpers;
+        IIndexed<string, IHelperDescriptor<HelperOptions>> IHelpersRegistry.GetHelpers() => ((IHelpersRegistry) Frame).GetHelpers();
 
-        IIndexed<string, IHelperDescriptor<BlockHelperOptions>> IHelpersRegistry.GetBlockHelpers() => Frame.BlockHelpers;
+        IIndexed<string, IHelperDescriptor<BlockHelperOptions>> IHelpersRegistry.GetBlockHelpers() => ((IHelpersRegistry) Frame).GetBlockHelpers();
     }
 }
