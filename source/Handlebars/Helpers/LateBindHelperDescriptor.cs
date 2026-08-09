@@ -13,7 +13,9 @@ namespace HandlebarsDotNet.Helpers
         {
             var bindingContext = options.Frame;
 
-            if(options.Frame.Helpers.TryGetValue(Name, out var contextHelper))
+            // Frame-local helpers only exist once something wrote to a frame's helper registry
+            // (decorators / in-render registration); skip the cascade walk in the common case.
+            if(bindingContext.HasFrameHelpers && bindingContext.Helpers.TryGetValue(Name, out var contextHelper))
             {
                 return contextHelper.Invoke(options, context, arguments);
             }

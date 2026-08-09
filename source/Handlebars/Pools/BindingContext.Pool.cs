@@ -48,6 +48,7 @@ namespace HandlebarsDotNet
                 {
                     item.Configuration = null!;
 
+                    item.HasFrameHelpers = false;
                     item.Root = null!;
                     item.Value = null!;
                     item.ParentContext = null;

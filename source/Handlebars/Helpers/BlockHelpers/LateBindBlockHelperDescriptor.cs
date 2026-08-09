@@ -16,7 +16,9 @@ namespace HandlebarsDotNet.Helpers.BlockHelpers
 
         public void Invoke(in EncodedTextWriter output, in BlockHelperOptions options, in Context context, in Arguments arguments)
         {
-            if(options.Frame.BlockHelpers.TryGetValue(Name, out var contextHelper))
+            // Frame-local helpers only exist once something wrote to a frame's helper registry
+            // (decorators / in-render registration); skip the cascade walk in the common case.
+            if(options.Frame.HasFrameHelpers && options.Frame.BlockHelpers.TryGetValue(Name, out var contextHelper))
             {
                 contextHelper.Invoke(options, context, arguments);
                 return;
