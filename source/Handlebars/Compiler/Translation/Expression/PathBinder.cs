@@ -9,6 +9,10 @@ namespace HandlebarsDotNet.Compiler
 {
     internal class PathBinder : HandlebarsExpressionVisitor
     {
+        private static readonly System.Reflection.MethodInfo WriteObjectToMethod =
+            typeof(EncodedTextWriter).GetMethod("WriteObjectTo",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+
         private CompilationContext CompilationContext { get; }
 
         public PathBinder(CompilationContext compilationContext)
@@ -68,12 +72,20 @@ namespace HandlebarsDotNet.Compiler
                 var contextValue = New(() => new Context(bindingContext));
                 var args = New(() => new Arguments(0));
                 var textWriter = CompilationContext.Args.EncodedWriter;
+                // Kept inline (unlike the plain-path statement route below): this is the
+                // hottest render-time shape, and routing it through a NoInlining entry point
+                // costs ~2ns per value per render. Compile cost of this shape is moderate
+                // because the interface dispatch below cannot be inline-expanded by the JIT.
                 return Call(() => helper.Value.Invoke(textWriter, options, contextValue, args));
             }
 
             var writer = CompilationContext.Args.EncodedWriter;
             var value = Arg<object>(Visit(sex.Body));
-            return writer.Call(o => o.Write<object>(value));
+            // Emit as a static call with the writer in (in-)argument position: LambdaCompiler
+            // compiles an instance call on the struct parameter whose argument is a call
+            // result dramatically slower (~0.3ms+ per statement) than the equivalent
+            // static-call shape used by the helper invocation route.
+            return Expression.Call(WriteObjectToMethod, writer.Expression, value.Expression);
         }
 
         protected override Expression VisitPathExpression(PathExpression pex)
@@ -119,10 +131,9 @@ namespace HandlebarsDotNet.Compiler
                 }
             }
 
-            var options = New(() => new HelperOptions(pathInfo, bindingContext));
-            var context = New(() => new Context(bindingContext));
-            var argumentsArg = New(() => new Arguments(0));
-            return Call(() => helper.Value.Invoke(options, context, argumentsArg));
+            // Single NoInlining entry point instead of inline options/context/arguments
+            // construction + dispatch — see CompiledHelperInvokers for rationale.
+            return Call(() => CompiledHelperInvokers.Invoke(helper, pathInfo, bindingContext));
         }
     }
 }

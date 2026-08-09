@@ -114,6 +114,14 @@ namespace HandlebarsDotNet
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public void Write(object? value) => Write<object>(value);
 
+		// Static entry point used by compiled templates ({{expr}} statements). NoInlining is
+		// what makes template compilation fast: dynamic methods are JIT-compiled at
+		// CreateDelegate, and inlining the aggressive-inline Write<object> type-switch and
+		// encoder machinery into every mustache call site multiplied template JIT cost ~6x.
+		// This wrapper is JIT-compiled once per process; templates emit one thin call.
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		internal static void WriteObjectTo(in EncodedTextWriter writer, object? value) => writer.Write<object>(value);
+
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public void Write<T>(T? value)
 		{
