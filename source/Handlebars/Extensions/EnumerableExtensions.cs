@@ -12,7 +12,14 @@ namespace HandlebarsDotNet
         public static bool Any(this IEnumerable builder)
         {
             var enumerator = builder.GetEnumerator();
-            return enumerator.MoveNext();
+            try
+            {
+                return enumerator.MoveNext();
+            }
+            finally
+            {
+                (enumerator as IDisposable)?.Dispose();
+            }
         }
         
         public static bool IsOneOf<TSource, TExpected>(this IEnumerable<TSource> source)

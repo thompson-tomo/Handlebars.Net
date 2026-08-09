@@ -40,11 +40,25 @@ namespace HandlebarsDotNet
                     return IsFalsyJsonElement(element, includeZero);
             }
 
-            if (IsNumber(value) && !includeZero)
+            if (includeZero) return false;
+
+            // Typed zero checks in likelihood order; avoids IsNumber's isinst cascade
+            // followed by Convert.ToBoolean's IConvertible dispatch on the hot path.
+            return value switch
             {
-                return !Convert.ToBoolean(value);
-            }
-            return false;
+                int i => i == 0,
+                long l => l == 0L,
+                double d => d == 0d,
+                float f => f == 0f,
+                decimal m => m == 0m,
+                byte b8 => b8 == 0,
+                sbyte s8 => s8 == 0,
+                short s16 => s16 == 0,
+                ushort u16 => u16 == 0,
+                uint u32 => u32 == 0u,
+                ulong u64 => u64 == 0ul,
+                _ => false
+            };
         }
 
         private static bool IsFalsyJsonElement(JsonElement element, bool includeZero)
@@ -84,23 +98,13 @@ namespace HandlebarsDotNet
                     || (element.ValueKind == JsonValueKind.Array && element.GetArrayLength() == 0);
             }
 
+            // O(1) emptiness checks that avoid allocating an enumerator for the common
+            // collection shapes; the IEnumerable fallback boxes List<T>-style struct enumerators.
+            if (value is ICollection collection) return collection.Count == 0;
+
             return value is IEnumerable enumerable && !enumerable.Any();
         }
 
-        private static bool IsNumber([NotNullWhen(true)] object? value)
-        {
-            return value is sbyte
-                || value is byte
-                || value is short
-                || value is ushort
-                || value is int
-                || value is uint
-                || value is long
-                || value is ulong
-                || value is float
-                || value is double
-                || value is decimal;
-        }
     }
 }
 
